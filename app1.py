@@ -6,22 +6,47 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 # Function to fetch research papers from IEEE website
-def fetch_ieee_papers():
-    url = 'https://ieeexplore.ieee.org/'
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    papers = soup.find_all('h2', class_='title')
-    paper_titles = [paper.text.strip() for paper in papers]
-    return paper_titles
+def fetch_ieee_papers(query):
+    url = "https://ieeexplore.ieee.org/search/searchresult.jsp"
+    params = {
+        "newsearch": "true",
+        "queryText": query,
+        "highlight": "true",
+        "returnFacets": "ALL",
+        "returnType": "SEARCH",
+        "pageNumber": 1
+    }
 
-# Function to fetch research papers from Springer website
-def fetch_springer_papers():
-    url = 'https://link.springer.com/'
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    papers = soup.find_all('h2', class_='title')
-    paper_titles = [paper.text.strip() for paper in papers]
-    return paper_titles
+    response = requests.get(url, params=params)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    papers = []
+    for result in soup.find_all(class_="List-results-items"):
+        title = result.find(class_="title").text.strip()
+        authors = result.find(class_="authors").text.strip()
+        abstract = result.find(class_="description").text.strip()
+        papers.append((title, authors, abstract))
+
+    return papers
+
+
+def fetch_springer_papers(query):
+    url = "https://link.springer.com/search"
+    params = {
+        "query": query
+    }
+
+    response = requests.get(url, params=params)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    papers = []
+    for result in soup.find_all(class_="result-item"):
+        title = result.find(class_="title").text.strip()
+        authors = result.find(class_="authors").text.strip()
+        abstract = result.find(class_="snippet").text.strip()
+        papers.append((title, authors, abstract))
+
+    return papers
 
 # Function to send recommendation email
 def send_recommendation_email(user_email, recommendations):
