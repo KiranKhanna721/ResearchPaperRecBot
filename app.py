@@ -1,8 +1,10 @@
-import pandas as pd
+import numpy as np
 import streamlit as st
+import pandas as pd
 import hashlib
 import sqlite3 
 import app1
+
 
 def make_hashes(password):
 	return hashlib.sha256(str.encode(password)).hexdigest()
