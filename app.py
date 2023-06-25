@@ -36,7 +36,7 @@ def view_all_users():
 
 def main():
     st.title("ResearchPaperRecBot")
-    st.image("https://assets.entrepreneur.com/content/3x2/2000/1647397792-nft-art2.jpg?format=pjeg&auto=webp&crop=4:3")
+    st.image("https://www.aimlay.com/wp-content/uploads/2022/06/research-paper-3-1024x682.webp")
     menu = ["Login","SignUp"]
     choice = st.sidebar.selectbox("Menu",menu)
     if choice == "Login":
