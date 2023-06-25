@@ -1,103 +1,85 @@
-import streamlit as st    
+import streamlit as st
 import requests
-import bs4
 from bs4 import BeautifulSoup
 import smtplib
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-def fetch_ieee_papers(query):
-    url = "https://ieeexplore.ieee.org/search/searchresult.jsp"
-    params = {
-        "newsearch": "true",
-        "queryText": query,
-        "highlight": "true",
-        "returnFacets": "ALL",
-        "returnType": "SEARCH",
-        "pageNumber": 1
-    }
+# Function to fetch research papers from IEEE website
+def fetch_ieee_papers():
+    url = 'https://ieeexplore.ieee.org/'
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    papers = soup.find_all('h2', class_='title')
+    paper_titles = [paper.text.strip() for paper in papers]
+    return paper_titles
 
-    response = requests.get(url, params=params)
-    soup = BeautifulSoup(response.text, "html.parser")
+# Function to fetch research papers from Springer website
+def fetch_springer_papers():
+    url = 'https://link.springer.com/'
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    papers = soup.find_all('h2', class_='title')
+    paper_titles = [paper.text.strip() for paper in papers]
+    return paper_titles
 
-    papers = []
-    for result in soup.find_all(class_="List-results-items"):
-        title = result.find(class_="title").text.strip()
-        authors = result.find(class_="authors").text.strip()
-        abstract = result.find(class_="description").text.strip()
-        papers.append((title, authors, abstract))
+# Function to send recommendation email
+def send_recommendation_email(user_email, recommendations):
+    # Configure email details
+    sender_email = st.secrets["Email"]
+    sender_password = st.secrets["Password"]
 
-    return papers
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = user_email
+    msg['Subject'] = 'Research Paper Recommendations'
 
+    # Create the HTML content of the email
+    html_content = f'''
+    <html>
+    <body>
+        <h1>Research Paper Recommendations</h1>
+        <p>Here are some research papers based on your interests:</p>
+        <ul>
+    '''
 
-def fetch_springer_papers(query):
-    url = "https://link.springer.com/search"
-    params = {
-        "query": query
-    }
+    for paper in recommendations:
+        html_content += f'<li>{paper}</li>'
 
-    response = requests.get(url, params=params)
-    soup = BeautifulSoup(response.text, "html.parser")
+    html_content += '''
+        </ul>
+    </body>
+    </html>
+    '''
 
-    papers = []
-    for result in soup.find_all(class_="result-item"):
-        title = result.find(class_="title").text.strip()
-        authors = result.find(class_="authors").text.strip()
-        abstract = result.find(class_="snippet").text.strip()
-        papers.append((title, authors, abstract))
+    # Attach the HTML content to the email
+    msg.attach(MIMEText(html_content, 'html'))
 
-    return papers
-
-def send_email(recipient, subject, body):
-    # Replace with your SMTP server details
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
-    #smtp_username =  st.secrets["Username"]
-    smtp_password =  st.secrets["Password"]
-
-    sender =  st.secrets["Email"]
-
-    message = f"Subject: {subject}\n\n{body}"
-
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
+    # Send the email
+    with smtplib.SMTP('smtp.gmail.com', 587) as server:
         server.starttls()
-        server.login(sender, smtp_password)
-        server.sendmail(sender, recipient, message)
-        
-        
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+
+# Streamlit web application
 def app():
-    st.title("Research Paper Recommender")
-    interests = st.text_input("Enter your interests (comma-separated):")
-    email = st.text_input("Enter your email address:")
-    submit_button = st.button("Get Recommendations")
+    st.title('Research Paper Recommendation System')
 
-    if submit_button:
-        ieee_papers = fetch_ieee_papers(interests)
-        springer_papers = fetch_springer_papers(interests)
+    user_email = st.text_input('Enter your email address:')
+    user_interests = st.text_input('Enter your research interests (comma-separated):')
 
-        # Combine and vectorize the papers' abstracts
-        all_papers = ieee_papers + springer_papers
-        abstracts = [paper[2] for paper in all_papers]
-        vectorizer = TfidfVectorizer()
-        tfidf_matrix = vectorizer.fit_transform(abstracts)
+    if st.button('Get Recommendations'):
+        interests = [interest.strip() for interest in user_interests.split(',')]
 
-        # Calculate similarity between user interests and papers
-        user_vector = vectorizer.transform([interests])
-        similarities = cosine_similarity(user_vector, tfidf_matrix)
-        sorted_indices = similarities.argsort()[0][::-1]
+
+        ieee_papers = fetch_ieee_papers()
+        springer_papers = fetch_springer_papers()
+
         recommendations = []
-        for index in sorted_indices:
-            title = all_papers[index][0]
-            authors = all_papers[index][1]
-            abstract = all_papers[index][2]
-            recommendations.append((title, authors, abstract))
-        body = ""
-        for recommendation in recommendations[:5]:  # Sending top 5 recommendations
-            title, authors, abstract = recommendation
-            body += f"Title: {title}\n"
-            body += f"Authors: {authors}\n"
-            body += f"Abstract: {abstract}\n"
-            body += "\n"
+        for paper in ieee_papers + springer_papers:
+            for interest in interests:
+                if interest.lower() in paper.lower():
+                    recommendations.append(paper)
 
-        send_email(email, "Research Paper Recommendations", body)
-        st.success("Recommendation email has been sent!")
+        send_recommendation_email(user_email, recommendations)
+        st.success('Recommendation email sent!')
